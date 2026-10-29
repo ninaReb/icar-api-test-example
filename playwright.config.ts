@@ -10,8 +10,11 @@ import { defineConfig } from '@playwright/test';
  * request path would silently drop it.
  */
 const MOCK_PORT = 4010;
-const useMock = !process.env.BASE_URL;
-const baseURL = (process.env.BASE_URL ?? `http://localhost:${MOCK_PORT}`).replace(/\/?$/, '/');
+// GitHub Actions sets a missing repo variable to an EMPTY STRING (not "unset"), and `??` does
+// not fall back on ''. So treat empty/blank as "not provided".
+const rawBaseUrl = process.env.BASE_URL?.trim();
+const useMock = !rawBaseUrl;
+const baseURL = (rawBaseUrl || `http://localhost:${MOCK_PORT}`).replace(/\/?$/, '/');
 
 export default defineConfig({
   testDir: './tests',
