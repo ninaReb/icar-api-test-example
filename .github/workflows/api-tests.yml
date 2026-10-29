@@ -1,0 +1,64 @@
+name: api-tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *' # nightly full run
+  workflow_dispatch:
+
+env:
+  BASE_URL: ${{ vars.API_BASE_URL }} # unset -> the suite falls back to the mock server
+  TOKEN_DEALER_A: ${{ secrets.TOKEN_DEALER_A }}
+  TOKEN_DEALER_B: ${{ secrets.TOKEN_DEALER_B }}
+  SUPPLIER_ID: ${{ vars.SUPPLIER_ID }}
+
+jobs:
+  # Quality gate 1: runs on every PR, blocks merge. Budget: <= 10 min.
+  smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright test --grep @smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-report
+          path: |
+            playwright-report/
+            results/
+
+  # Quality gate 2: after merge and on the nightly schedule. Blocks promotion to staging.
+  regression:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regression-report
+          path: |
+            playwright-report/
+            results/
+
+  # Planned, not part of this exercise: TestComplete UI smoke for the PowerBuilder client.
+  # It needs a Windows runner with TestComplete installed, runs nightly and on release
+  # candidates, and is not a PR gate until its flake rate is low.
+  # ui-smoke:
+  #   runs-on: [self-hosted, windows]
